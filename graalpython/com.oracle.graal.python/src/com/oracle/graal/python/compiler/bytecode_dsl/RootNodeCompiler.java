@@ -980,10 +980,7 @@ public class RootNodeCompiler implements BaseBytecodeDSLVisitor<BytecodeDSLCompi
         BytecodeLocal local = locals.get(mangled);
         switch (op) {
             case Read:
-                b.beginBlock();
-                b.emitCheckUnboundLocal(local, varnames.get(mangled));
-                b.emitLoadLocal(local);
-                b.endBlock();
+                b.emitCheckAndLoadLocal(local, varnames.get(mangled));
                 break;
             case Delete:
                 b.emitDeleteLocal(local, varnames.get(mangled));

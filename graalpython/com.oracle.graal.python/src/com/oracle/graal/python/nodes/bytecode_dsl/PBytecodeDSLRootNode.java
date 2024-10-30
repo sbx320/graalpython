@@ -3952,12 +3952,45 @@ public abstract class PBytecodeDSLRootNode extends PRootNode implements Bytecode
         }
     }
 
+    /**
+     * Loads a user-defined local variable. Unlike a built-in LoadLocal, this operation raises an
+     * unbound local error if the local has not been set.
+     * <p>
+     * This operation makes use of Truffle's boxing overloads. When an operation tries to quicken
+     * this one for boxing elimination, the correct overload will be selected.
+     */
     @Operation
     @ConstantOperand(type = LocalAccessor.class)
     @ConstantOperand(type = int.class)
-    public static final class CheckUnboundLocal {
-        @Specialization
-        public static void doObject(VirtualFrame frame, LocalAccessor accessor, int index,
+    public static final class CheckAndLoadLocal {
+        @Specialization(rewriteOn = UnexpectedResultException.class)
+        public static int doInt(VirtualFrame frame, LocalAccessor accessor, int index,
+                        @Bind PBytecodeDSLRootNode rootNode,
+                        @Bind BytecodeNode bytecodeNode,
+                        @Bind Node inliningTarget,
+                        @Shared @Cached InlinedBranchProfile localUnboundProfile) throws UnexpectedResultException {
+            if (accessor.isCleared(bytecodeNode, frame)) {
+                localUnboundProfile.enter(inliningTarget);
+                throw raiseUnbound(rootNode, inliningTarget, index);
+            }
+            return accessor.getInt(bytecodeNode, frame);
+        }
+
+        @Specialization(rewriteOn = UnexpectedResultException.class)
+        public static boolean doBoolean(VirtualFrame frame, LocalAccessor accessor, int index,
+                        @Bind PBytecodeDSLRootNode rootNode,
+                        @Bind BytecodeNode bytecodeNode,
+                        @Bind Node inliningTarget,
+                        @Shared @Cached InlinedBranchProfile localUnboundProfile) throws UnexpectedResultException {
+            if (accessor.isCleared(bytecodeNode, frame)) {
+                localUnboundProfile.enter(inliningTarget);
+                throw raiseUnbound(rootNode, inliningTarget, index);
+            }
+            return accessor.getBoolean(bytecodeNode, frame);
+        }
+
+        @Specialization(replaces = {"doInt", "doBoolean"})
+        public static Object doObject(VirtualFrame frame, LocalAccessor accessor, int index,
                         @Bind PBytecodeDSLRootNode rootNode,
                         @Bind BytecodeNode bytecodeNode,
                         @Bind Node inliningTarget,
@@ -3966,6 +3999,7 @@ public abstract class PBytecodeDSLRootNode extends PRootNode implements Bytecode
                 localUnboundProfile.enter(inliningTarget);
                 throw raiseUnbound(rootNode, inliningTarget, index);
             }
+            return accessor.getObject(bytecodeNode, frame);
         }
     }
 
