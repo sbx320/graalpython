@@ -3707,9 +3707,8 @@ public class RootNodeCompiler implements BaseBytecodeDSLVisitor<BytecodeDSLCompi
 
             for (int i = 0; i < n; i++) {
                 b.beginStoreLocal(pc.subject);
-                b.beginArrayIndex();
+                b.beginArrayIndex(i);
                 b.emitLoadLocal(unpacked);
-                b.emitLoadConstant(i);
                 b.endArrayIndex();
                 b.endStoreLocal();
 

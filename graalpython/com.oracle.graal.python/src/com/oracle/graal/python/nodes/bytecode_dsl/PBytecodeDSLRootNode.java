@@ -892,9 +892,10 @@ public abstract class PBytecodeDSLRootNode extends PRootNode implements Bytecode
     }
 
     @Operation
+    @ConstantOperand(type = int.class)
     public static final class ArrayIndex {
         @Specialization
-        public static Object doObject(Object[] array, int i) {
+        public static Object doObject(int i, Object[] array) {
             return array[i];
         }
     }
