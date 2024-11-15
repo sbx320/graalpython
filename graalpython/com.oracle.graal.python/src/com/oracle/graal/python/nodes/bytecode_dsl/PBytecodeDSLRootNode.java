@@ -711,7 +711,7 @@ public abstract class PBytecodeDSLRootNode extends PRootNode implements Bytecode
     }
 
     @Override
-    public Throwable interceptInternalException(Throwable throwable, BytecodeNode bytecodeNode, int bci) {
+    public Throwable interceptInternalException(Throwable throwable, VirtualFrame frame, BytecodeNode bytecodeNode, int bci) {
         if (throwable instanceof StackOverflowError soe) {
             PythonContext.get(this).ensureGilAfterFailure();
             return ExceptionUtils.wrapJavaException(soe, this, factory.createBaseException(RecursionError, ErrorMessages.MAXIMUM_RECURSION_DEPTH_EXCEEDED, new Object[]{}));

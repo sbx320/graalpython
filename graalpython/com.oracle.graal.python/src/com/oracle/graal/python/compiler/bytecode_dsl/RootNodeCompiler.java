@@ -4268,7 +4268,7 @@ public final class RootNodeCompiler implements BaseBytecodeDSLVisitor<BytecodeDS
                             b.beginBlock(); // try
                                 SourceRange bareExceptRange = null;
                                 for (ExceptHandlerTy h : node.handlers) {
-boolean newStatement = beginSourceSection(h, b);
+                                    boolean newStatement = beginSourceSection(h, b);
                                     if (bareExceptRange != null) {
                                         ctx.errorCallback.onError(ErrorType.Syntax, currentLocation, "default 'except:' must be last");
                                     }
