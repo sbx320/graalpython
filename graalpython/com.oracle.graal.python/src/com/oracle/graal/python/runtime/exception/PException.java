@@ -81,6 +81,7 @@ import com.oracle.truffle.api.source.SourceSection;
  * object must be created for each throw.
  */
 @ExportLibrary(value = InteropLibrary.class, delegateTo = "pythonException")
+@SuppressWarnings({"serial"})
 public final class PException extends AbstractTruffleException {
     private static final long serialVersionUID = -6437116280384996361L;
 
@@ -101,29 +102,54 @@ public final class PException extends AbstractTruffleException {
     private boolean skipFirstTracebackFrame;
     private int tracebackFrameCount;
 
+    /**
+     * We create new {@link PException} instances wrapping the same {@link PBaseException} as the
+     * stack is unwound when the exception is reraised. See {@link MaterializeLazyTracebackNode} for
+     * more details.
+     * <p>
+     * Since the new {@link PException} for reraise will be thrown from different frame than the
+     * initial {@link PException}, Truffle will think that it belongs to that frame and not to the
+     * original frame. Truffle expects the {@link AbstractTruffleException#getLocation()} to belong
+     * the (AST of the root node of) frame where the exception was thrown. If we just copy the
+     * location from the initial {@link PException} to the {@link PException} constructed for
+     * reraise, the location would not satisfy that property, but at the same time we like to keep
+     * the original location to use it in {@link InteropLibrary#getSourceLocation} message.
+     */
+    private final Node originalLocation;
+
     private PException(Object pythonException, Node node) {
         super(node);
         this.pythonException = pythonException;
+        this.originalLocation = node;
     }
 
-    private PException(Object pythonException, Node node, Throwable wrapped) {
-        super(null, wrapped, UNLIMITED_STACK_TRACE, node);
+    private PException(Object pythonException, Node location, Node originalLocation, Throwable wrapped) {
+        super(null, wrapped, UNLIMITED_STACK_TRACE, location);
         this.pythonException = pythonException;
+        this.originalLocation = originalLocation;
         assert PyExceptionInstanceCheckNode.executeUncached(pythonException);
     }
 
-    public static PException fromObject(Object pythonException, Node node, boolean withJavaStacktrace) {
+    public static PException fromObject(Object pythonException, Node location, boolean withJavaStacktrace) {
+        return fromObject(pythonException, location, location, withJavaStacktrace);
+    }
+
+    public static PException fromObject(Object pythonException, Node location, Node originalLocation, boolean withJavaStacktrace) {
         Throwable wrapped = null;
         if (withJavaStacktrace) {
             // Create a carrier for the java stacktrace as PException cannot have one
             wrapped = createStacktraceCarrier();
         }
-        return fromObject(pythonException, node, wrapped);
+        return fromObject(pythonException, location, originalLocation, wrapped);
     }
 
     @TruffleBoundary
     private static RuntimeException createStacktraceCarrier() {
         return new RuntimeException();
+    }
+
+    public static PException fromObject(Object pythonException, Node location, Throwable wrapped) {
+        return fromObject(pythonException, location, location, wrapped);
     }
 
     /*
@@ -132,8 +158,8 @@ public final class PException extends AbstractTruffleException {
      * guarantee on how many. Therefore, it is important that this method is simple. In particular,
      * do not add calls if that can be avoided.
      */
-    public static PException fromObject(Object pythonException, Node node, Throwable wrapped) {
-        PException pException = new PException(pythonException, node, wrapped);
+    public static PException fromObject(Object pythonException, Node node, Node originalLocation, Throwable wrapped) {
+        PException pException = new PException(pythonException, node, originalLocation, wrapped);
         if (pythonException instanceof PBaseException managedException) {
             managedException.setException(pException);
         }
@@ -146,7 +172,7 @@ public final class PException extends AbstractTruffleException {
             // Create a carrier for the java stacktrace as PException cannot have one
             wrapped = createStacktraceCarrier();
         }
-        PException pException = new PException(pythonException, null, wrapped);
+        PException pException = new PException(pythonException, null, null, wrapped);
         pException.reified = true;
         if (pythonException instanceof PBaseException managedException) {
             managedException.setException(pException);
@@ -394,7 +420,7 @@ public final class PException extends AbstractTruffleException {
      */
     public PException getExceptionForReraise(boolean rootNodeVisible) {
         ensureReified();
-        PException pe = PException.fromObject(pythonException, getLocation(), false);
+        PException pe = PException.fromObject(pythonException, null, getLocation(), false);
         if (rootNodeVisible) {
             pe.skipFirstTracebackFrame();
         }
@@ -444,7 +470,7 @@ public final class PException extends AbstractTruffleException {
     @ExportMessage
     @SuppressWarnings("static-method")
     boolean hasSourceLocation() {
-        return getLocation() != null && getLocation().getEncapsulatingSourceSection() != null;
+        return originalLocation != null && originalLocation.getEncapsulatingSourceSection() != null;
     }
 
     @ExportMessage(name = "getSourceLocation")
@@ -452,7 +478,7 @@ public final class PException extends AbstractTruffleException {
                     @Bind("$node") Node inliningTarget,
                     @Cached InlinedBranchProfile unsupportedProfile) throws UnsupportedMessageException {
         if (hasSourceLocation()) {
-            return getLocation().getEncapsulatingSourceSection();
+            return originalLocation.getEncapsulatingSourceSection();
         }
         unsupportedProfile.enter(inliningTarget);
         throw UnsupportedMessageException.create();
