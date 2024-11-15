@@ -1,8 +1,48 @@
+/*
+ * Copyright (c) 2024, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * The Universal Permissive License (UPL), Version 1.0
+ *
+ * Subject to the condition set forth below, permission is hereby granted to any
+ * person obtaining a copy of this software, associated documentation and/or
+ * data (collectively the "Software"), free of charge and under any and all
+ * copyright rights in the Software, and any and all patent rights owned or
+ * freely licensable by each licensor hereunder covering either (i) the
+ * unmodified Software as contributed to or provided by such licensor, or (ii)
+ * the Larger Works (as defined below), to deal in both
+ *
+ * (a) the Software, and
+ *
+ * (b) any piece of software and/or hardware listed in the lrgrwrks.txt file if
+ * one is included with the Software each a "Larger Work" to which the Software
+ * is contributed by such licensors),
+ *
+ * without restriction, including without limitation the rights to copy, create
+ * derivative works of, display, perform, and distribute the Software and make,
+ * use, sell, offer for sale, import, export, have made, and have sold the
+ * Software and the Larger Work(s), and to sublicense the foregoing rights on
+ * either these or other terms.
+ *
+ * This license is subject to the following condition:
+ *
+ * The above copyright notice and either this complete permission notice or at a
+ * minimum a reference to the UPL must be included in all copies or substantial
+ * portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package com.oracle.graal.python.compiler.bytecode_dsl;
 
 import static com.oracle.graal.python.compiler.CompilationScope.Class;
-import static com.oracle.graal.python.util.PythonUtils.toTruffleStringUncached;
 import static com.oracle.graal.python.nodes.SpecialAttributeNames.J___CLASS__;
+import static com.oracle.graal.python.util.PythonUtils.toTruffleStringUncached;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,17 +64,17 @@ import com.oracle.graal.python.compiler.CompilationScope;
 import com.oracle.graal.python.compiler.Compiler;
 import com.oracle.graal.python.compiler.Compiler.ConstantCollection;
 import com.oracle.graal.python.compiler.OpCodes.CollectionBits;
+import com.oracle.graal.python.compiler.Unparser;
 import com.oracle.graal.python.compiler.bytecode_dsl.BytecodeDSLCompiler.BytecodeDSLCompilerContext;
 import com.oracle.graal.python.compiler.bytecode_dsl.BytecodeDSLCompiler.BytecodeDSLCompilerResult;
-import com.oracle.graal.python.compiler.Unparser;
 import com.oracle.graal.python.nodes.StringLiterals;
 import com.oracle.graal.python.nodes.bytecode_dsl.BytecodeDSLCodeUnit;
 import com.oracle.graal.python.nodes.bytecode_dsl.PBytecodeDSLRootNode;
 import com.oracle.graal.python.nodes.bytecode_dsl.PBytecodeDSLRootNodeGen;
 import com.oracle.graal.python.nodes.bytecode_dsl.PBytecodeDSLRootNodeGen.Builder;
-import com.oracle.graal.python.pegparser.FutureFeature;
 import com.oracle.graal.python.pegparser.ErrorCallback.ErrorType;
 import com.oracle.graal.python.pegparser.ErrorCallback.WarningType;
+import com.oracle.graal.python.pegparser.FutureFeature;
 import com.oracle.graal.python.pegparser.scope.Scope;
 import com.oracle.graal.python.pegparser.scope.Scope.DefUse;
 import com.oracle.graal.python.pegparser.sst.AliasTy;
@@ -48,6 +88,12 @@ import com.oracle.graal.python.pegparser.sst.ConstantValue.Kind;
 import com.oracle.graal.python.pegparser.sst.ExceptHandlerTy;
 import com.oracle.graal.python.pegparser.sst.ExprContextTy;
 import com.oracle.graal.python.pegparser.sst.ExprTy;
+import com.oracle.graal.python.pegparser.sst.ExprTy.Constant;
+import com.oracle.graal.python.pegparser.sst.ExprTy.DictComp;
+import com.oracle.graal.python.pegparser.sst.ExprTy.GeneratorExp;
+import com.oracle.graal.python.pegparser.sst.ExprTy.Lambda;
+import com.oracle.graal.python.pegparser.sst.ExprTy.ListComp;
+import com.oracle.graal.python.pegparser.sst.ExprTy.SetComp;
 import com.oracle.graal.python.pegparser.sst.KeywordTy;
 import com.oracle.graal.python.pegparser.sst.MatchCaseTy;
 import com.oracle.graal.python.pegparser.sst.ModTy;
@@ -55,24 +101,18 @@ import com.oracle.graal.python.pegparser.sst.OperatorTy;
 import com.oracle.graal.python.pegparser.sst.PatternTy;
 import com.oracle.graal.python.pegparser.sst.SSTNode;
 import com.oracle.graal.python.pegparser.sst.StmtTy;
+import com.oracle.graal.python.pegparser.sst.StmtTy.AsyncFunctionDef;
 import com.oracle.graal.python.pegparser.sst.UnaryOpTy;
 import com.oracle.graal.python.pegparser.sst.WithItemTy;
-import com.oracle.graal.python.pegparser.sst.ExprTy.Constant;
-import com.oracle.graal.python.pegparser.sst.ExprTy.DictComp;
-import com.oracle.graal.python.pegparser.sst.ExprTy.GeneratorExp;
-import com.oracle.graal.python.pegparser.sst.ExprTy.Lambda;
-import com.oracle.graal.python.pegparser.sst.ExprTy.ListComp;
-import com.oracle.graal.python.pegparser.sst.ExprTy.SetComp;
-import com.oracle.graal.python.pegparser.sst.StmtTy.AsyncFunctionDef;
 import com.oracle.graal.python.pegparser.tokenizer.SourceRange;
 import com.oracle.graal.python.util.PythonUtils;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.bytecode.BytecodeConfig;
 import com.oracle.truffle.api.bytecode.BytecodeLabel;
 import com.oracle.truffle.api.bytecode.BytecodeLocal;
+import com.oracle.truffle.api.bytecode.BytecodeParser;
 import com.oracle.truffle.api.bytecode.BytecodeRootNodes;
 import com.oracle.truffle.api.instrumentation.StandardTags.StatementTag;
-import com.oracle.truffle.api.bytecode.BytecodeParser;
 import com.oracle.truffle.api.strings.TruffleString;
 
 /**
@@ -82,7 +122,7 @@ import com.oracle.truffle.api.strings.TruffleString;
  * This visitor is a small wrapper that calls into another visitor, {@link StatementCompiler}, to
  * produce bytecode for the various statements/expressions within the AST.
  */
-public class RootNodeCompiler implements BaseBytecodeDSLVisitor<BytecodeDSLCompilerResult> {
+public final class RootNodeCompiler implements BaseBytecodeDSLVisitor<BytecodeDSLCompilerResult> {
     /**
      * Because a {@link RootNodeCompiler} instance gets reused on reparse, it should be idempotent.
      * Consequently, most of its fields are final and immutable/not mutated after construction. For
@@ -303,41 +343,45 @@ public class RootNodeCompiler implements BaseBytecodeDSLVisitor<BytecodeDSLCompi
         }
     }
 
-    protected final void checkForbiddenName(String id, NameOperation context) {
+    private void checkForbiddenName(String id, NameOperation context) {
+        checkForbiddenName(id, context, currentLocation);
+    }
+
+    private void checkForbiddenName(String id, NameOperation context, SourceRange location) {
         if (context == NameOperation.BeginWrite) {
             if (id.equals("__debug__")) {
-                ctx.errorCallback.onError(ErrorType.Syntax, currentLocation, "cannot assign to __debug__");
+                ctx.errorCallback.onError(ErrorType.Syntax, location, "cannot assign to __debug__");
             }
         }
         if (context == NameOperation.Delete) {
             if (id.equals("__debug__")) {
-                ctx.errorCallback.onError(ErrorType.Syntax, currentLocation, "cannot delete __debug__");
+                ctx.errorCallback.onError(ErrorType.Syntax, location, "cannot delete __debug__");
             }
         }
     }
 
-    private void checkForbiddenArgs(ArgumentsTy args) {
+    private void checkForbiddenArgs(ArgumentsTy args, SourceRange location) {
         if (args != null) {
             if (args.posOnlyArgs != null) {
                 for (ArgTy arg : args.posOnlyArgs) {
-                    checkForbiddenName(arg.arg, NameOperation.BeginWrite);
+                    checkForbiddenName(arg.arg, NameOperation.BeginWrite, location);
                 }
             }
             if (args.args != null) {
                 for (ArgTy arg : args.args) {
-                    checkForbiddenName(arg.arg, NameOperation.BeginWrite);
+                    checkForbiddenName(arg.arg, NameOperation.BeginWrite, location);
                 }
             }
             if (args.kwOnlyArgs != null) {
                 for (ArgTy arg : args.kwOnlyArgs) {
-                    checkForbiddenName(arg.arg, NameOperation.BeginWrite);
+                    checkForbiddenName(arg.arg, NameOperation.BeginWrite, location);
                 }
             }
             if (args.varArg != null) {
-                checkForbiddenName(args.varArg.arg, NameOperation.BeginWrite);
+                checkForbiddenName(args.varArg.arg, NameOperation.BeginWrite, location);
             }
             if (args.kwArg != null) {
-                checkForbiddenName(args.kwArg.arg, NameOperation.BeginWrite);
+                checkForbiddenName(args.kwArg.arg, NameOperation.BeginWrite, location);
             }
         }
     }
@@ -436,7 +480,7 @@ public class RootNodeCompiler implements BaseBytecodeDSLVisitor<BytecodeDSLCompi
 
         b.beginRoot();
 
-        checkForbiddenArgs(args);
+        checkForbiddenArgs(args, node.getSourceRange());
         setUpFrame(args, b);
 
         b.emitTraceOrProfileCall();
@@ -4041,10 +4085,10 @@ public class RootNodeCompiler implements BaseBytecodeDSLVisitor<BytecodeDSLCompi
 
         @Override
         public Void visit(StmtTy.Return node) {
+            boolean newStatement = beginSourceSection(node, b);
             if (!scope.isFunction()) {
                 ctx.errorCallback.onError(ErrorType.Syntax, currentLocation, "'return' outside function");
             }
-            boolean newStatement = beginSourceSection(node, b);
             beginReturn(b);
             if (node.value != null) {
                 node.value.accept(this);
@@ -4538,10 +4582,10 @@ boolean newStatement = beginSourceSection(h, b);
 
         @Override
         public Void visit(StmtTy.Break aThis) {
+            boolean newStatement = beginSourceSection(aThis, b);
             if (breakLabel == null) {
                 ctx.errorCallback.onError(ErrorType.Syntax, currentLocation, "'break' outside loop");
             }
-            boolean newStatement = beginSourceSection(aThis, b);
             b.emitBranch(breakLabel);
             endSourceSection(b, newStatement);
             return null;
@@ -4549,10 +4593,10 @@ boolean newStatement = beginSourceSection(h, b);
 
         @Override
         public Void visit(StmtTy.Continue aThis) {
+            boolean newStatement = beginSourceSection(aThis, b);
             if (continueLabel == null) {
                 ctx.errorCallback.onError(ErrorType.Syntax, currentLocation, "'continue' not properly in loop");
             }
-            boolean newStatement = beginSourceSection(aThis, b);
             b.emitBranch(continueLabel);
             endSourceSection(b, newStatement);
             return null;
