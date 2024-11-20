@@ -368,7 +368,7 @@ public abstract class PBytecodeDSLRootNode extends PRootNode implements Bytecode
 
     @Override
     public String toString() {
-        return "<function op " + co.name + ">";
+        return "<bytecode " + co.name + " at " + Integer.toHexString(hashCode()) + ">";
     }
 
     @Prolog
