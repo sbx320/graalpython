@@ -1076,17 +1076,17 @@ public abstract class PBytecodeDSLRootNode extends PRootNode implements Bytecode
          */
 
         @Specialization(rewriteOn = ArithmeticException.class)
-        public static int add(int left, int right) {
+        public static int doIIExact(int left, int right) {
             return Math.addExact(left, right);
         }
 
-        @Specialization
-        public static long doIIOvf(int x, int y) {
+        @Specialization(replaces = "doIIExact")
+        public static long doIIOverflow(int x, int y) {
             return x + (long) y;
         }
 
         @Specialization(rewriteOn = ArithmeticException.class)
-        public static long addLong(long left, long right) {
+        public static long doLL(long left, long right) {
             return Math.addExact(left, right);
         }
 
@@ -1140,13 +1140,13 @@ public abstract class PBytecodeDSLRootNode extends PRootNode implements Bytecode
         }
 
         @Specialization
-        static TruffleString doIt(TruffleString left, TruffleString right,
+        static TruffleString doString(TruffleString left, TruffleString right,
                         @Cached(inline = false) TruffleString.ConcatNode concatNode) {
             return concatNode.execute(left, right, PythonUtils.TS_ENCODING, false);
         }
 
         @Fallback
-        static Object doIt(VirtualFrame frame, Object v, Object w,
+        static Object doFallback(VirtualFrame frame, Object v, Object w,
                         @Bind Node inliningTarget,
                         @Exclusive @Cached GetClassNode getVClass,
                         @Cached GetCachedTpSlotsNode getVSlots,
@@ -1190,12 +1190,12 @@ public abstract class PBytecodeDSLRootNode extends PRootNode implements Bytecode
          */
 
         @Specialization(rewriteOn = ArithmeticException.class)
-        public static int doII(int x, int y) throws ArithmeticException {
+        public static int doIIExact(int x, int y) throws ArithmeticException {
             return Math.multiplyExact(x, y);
         }
 
-        @Specialization(replaces = "doII")
-        public static long doIIL(int x, int y) {
+        @Specialization(replaces = "doIIExact")
+        public static long doIIOverflow(int x, int y) {
             return x * (long) y;
         }
 
