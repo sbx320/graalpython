@@ -42,7 +42,6 @@ package com.oracle.graal.python.nodes.bytecode_dsl;
 
 import static com.oracle.graal.python.builtins.PythonBuiltinClassType.AttributeError;
 import static com.oracle.graal.python.builtins.PythonBuiltinClassType.GeneratorExit;
-import static com.oracle.graal.python.builtins.PythonBuiltinClassType.RecursionError;
 import static com.oracle.graal.python.builtins.PythonBuiltinClassType.SystemError;
 import static com.oracle.graal.python.builtins.PythonBuiltinClassType.TypeError;
 import static com.oracle.graal.python.builtins.PythonBuiltinClassType.ValueError;
@@ -113,9 +112,7 @@ import com.oracle.graal.python.lib.CallBinaryOp1Node;
 import com.oracle.graal.python.lib.GetNextNode;
 import com.oracle.graal.python.lib.PyIndexCheckNode;
 import com.oracle.graal.python.lib.PyIterCheckNode;
-import com.oracle.graal.python.lib.PyNumberAddNode;
 import com.oracle.graal.python.lib.PyNumberAsSizeNode;
-import com.oracle.graal.python.lib.PyNumberMultiplyNode;
 import com.oracle.graal.python.lib.PyObjectAsciiNode;
 import com.oracle.graal.python.lib.PyObjectCallMethodObjArgs;
 import com.oracle.graal.python.lib.PyObjectDelItem;
@@ -197,6 +194,7 @@ import com.oracle.graal.python.runtime.PythonContext;
 import com.oracle.graal.python.runtime.PythonContext.ProfileEvent;
 import com.oracle.graal.python.runtime.PythonContext.PythonThreadState;
 import com.oracle.graal.python.runtime.PythonContext.TraceEvent;
+import com.oracle.graal.python.runtime.PythonOptions;
 import com.oracle.graal.python.runtime.exception.ExceptionUtils;
 import com.oracle.graal.python.runtime.exception.PException;
 import com.oracle.graal.python.runtime.exception.PythonErrorType;
@@ -741,11 +739,11 @@ public abstract class PBytecodeDSLRootNode extends PRootNode implements Bytecode
 
     @Override
     public Throwable interceptInternalException(Throwable throwable, VirtualFrame frame, BytecodeNode bytecodeNode, int bci) {
-        if (throwable instanceof StackOverflowError soe) {
-            PythonContext.get(this).ensureGilAfterFailure();
-            return ExceptionUtils.wrapJavaException(soe, this, factory.createBaseException(RecursionError, ErrorMessages.MAXIMUM_RECURSION_DEPTH_EXCEEDED, new Object[]{}));
+        if (PythonLanguage.get(this).getEngineOption(PythonOptions.CatchAllExceptions) && (throwable instanceof Exception || throwable instanceof AssertionError)) {
+            return ExceptionUtils.wrapJavaException(throwable, this, factory.createBaseException(SystemError, ErrorMessages.M, new Object[]{throwable}));
         }
-        return throwable;
+        PException wrapped = ExceptionUtils.wrapJavaExceptionIfApplicable(this, throwable, factory);
+        return wrapped != null ? wrapped : throwable;
     }
 
     @Override
@@ -3112,26 +3110,8 @@ public abstract class PBytecodeDSLRootNode extends PRootNode implements Bytecode
     public static final class SetCurrentException {
         @Specialization
         @InliningCutoff
-        public static void doPException(VirtualFrame frame, PException ex) {
+        public static void doPException(VirtualFrame frame, AbstractTruffleException ex) {
             PArguments.setException(frame, ex);
-        }
-
-        @Specialization(guards = {"notPException(ex)"})
-        @InliningCutoff
-        public static void doAbstractTruffleException(VirtualFrame frame, AbstractTruffleException ex,
-                        @Bind PBytecodeDSLRootNode rootNode) {
-            PArguments.setException(frame, ExceptionUtils.wrapJavaException(ex, rootNode, rootNode.factory.createBaseException(SystemError, ErrorMessages.M, new Object[]{ex})));
-        }
-
-        @Fallback
-        @InliningCutoff
-        public static void doNull(VirtualFrame frame, Object ex) {
-            assert ex == null;
-            PArguments.setException(frame, PException.NO_EXCEPTION);
-        }
-
-        static boolean notPException(AbstractTruffleException ex) {
-            return ex != null && !(ex instanceof PException);
         }
     }
 
